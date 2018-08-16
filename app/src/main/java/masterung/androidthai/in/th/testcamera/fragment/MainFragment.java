@@ -1,10 +1,12 @@
 package masterung.androidthai.in.th.testcamera.fragment;
 
 import android.content.Intent;
+import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.StrictMode;
 import android.provider.MediaStore;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
@@ -15,7 +17,12 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.ImageView;
+import android.widget.Toast;
 
+import java.io.File;
+
+import it.sauronsoftware.ftp4j.FTPClient;
+import it.sauronsoftware.ftp4j.FTPDataTransferListener;
 import masterung.androidthai.in.th.testcamera.R;
 
 public class MainFragment extends Fragment {
@@ -27,6 +34,34 @@ public class MainFragment extends Fragment {
         takePhoto();
 
     }   // Main Method
+
+    public class MyFTPDataTransferListener implements FTPDataTransferListener{
+        @Override
+        public void started() {
+            Toast.makeText(getActivity(), "Upload Start", Toast.LENGTH_SHORT).show();
+        }
+
+        @Override
+        public void transferred(int i) {
+            Toast.makeText(getActivity(), "Continue...", Toast.LENGTH_SHORT).show();
+        }
+
+        @Override
+        public void completed() {
+            Toast.makeText(getActivity(), "Upload Complete", Toast.LENGTH_SHORT).show();
+        }
+
+        @Override
+        public void aborted() {
+
+        }
+
+        @Override
+        public void failed() {
+
+        }
+    }
+
 
     private void takePhoto() {
         Button button = getView().findViewById(R.id.btnCamera);
@@ -49,6 +84,7 @@ public class MainFragment extends Fragment {
             ImageView imageView = getView().findViewById(R.id.imvAvata);
             Uri uri = data.getData();
 
+            FTPClient ftpClient = new FTPClient();
             try {
 
                 Bitmap bitmap = BitmapFactory.decodeStream(getActivity().getContentResolver().openInputStream(uri));
@@ -57,8 +93,39 @@ public class MainFragment extends Fragment {
 
                 imageView.setImageBitmap(bitmap1);
 
+                String pathImageString = null;
+                String[] strings = new String[]{MediaStore.Images.Media.DATA};
+                Cursor cursor = getActivity().getContentResolver().query(uri, strings, null, null, null);
+                if (cursor != null) {
+                    cursor.moveToFirst();
+                    int i = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATA);
+                    pathImageString = cursor.getString(i);
+                } else {
+                    pathImageString = uri.getPath();
+                }
+                Log.d("14AugV1", "Path ==> " + pathImageString);
+
+                StrictMode.ThreadPolicy policy = new StrictMode.ThreadPolicy
+                        .Builder().permitAll().build();
+                StrictMode.setThreadPolicy(policy);
+
+                File file = new File(pathImageString);
+
+
+                ftpClient.connect("ftp.androidthai.in.th", 21);
+                ftpClient.login("sun@androidthai.in.th", "Abc12345");
+                ftpClient.setType(FTPClient.TYPE_BINARY);
+                ftpClient.changeDirectory("TestCamera");
+                ftpClient.upload(file, new MyFTPDataTransferListener());
+
+
             } catch (Exception e) {
-                Log.d("14AugV1", "Error ==> " + e.toString());
+                Log.d("14AugV1", "Error e==> " + e.toString());
+                try {
+                    ftpClient.disconnect(true);
+                } catch (Exception e1) {
+                    Log.d("14AugV1", "Error e1==> " + e1.toString());
+                }
             }
 
         }
